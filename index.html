@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="משחק השחייה">
+<meta name="theme-color" content="#e0f4ff">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.png">
+<title>משחק השחייה</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: Arial, sans-serif;
+  background: linear-gradient(180deg, #e0f4ff 0%, #f0fbff 100%);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 1.5rem 1rem;
+  gap: 1.2rem;
+}
+
+/* SCREENS */
+.screen { display: none; width: 100%; max-width: 580px; flex-direction: column; align-items: center; gap: 1.2rem; }
+.screen.active { display: flex; }
+
+/* HOME SCREEN */
+#home-screen { text-align: center; padding-top: 2rem; }
+#home-screen h1 { font-size: 32px; color: #1a6fa8; margin-bottom: 0.5rem; }
+#home-screen .subtitle { font-size: 16px; color: #555; margin-bottom: 2rem; }
+
+#levels-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+.level-tile {
+  aspect-ratio: 1;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform 0.15s;
+}
+.level-tile:hover { transform: scale(1.05); }
+.level-tile.locked { background: #e8e8e8; color: #aaa; cursor: default; }
+.level-tile.locked:hover { transform: none; }
+.level-tile.available { background: white; color: #1a6fa8; border-color: #7ec8e3; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.level-tile.perfect { background: #1D9E75; color: white; border-color: #0F6E56; }
+.level-tile.completed { background: #b3e0f7; color: #1a6fa8; border-color: #7ec8e3; }
+.level-tile .tile-num { font-size: 20px; font-weight: 700; }
+.level-tile .tile-icon { font-size: 18px; }
+
+#start-btn {
+  background: #1D9E75;
+  color: white;
+  border: none;
+  border-radius: 14px;
+  padding: 16px 40px;
+  font-size: 20px;
+  cursor: pointer;
+  font-family: Arial, sans-serif;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(29,158,117,0.35);
+  transition: background 0.15s, transform 0.1s;
+}
+#start-btn:hover { background: #0F6E56; transform: scale(1.03); }
+
+/* GAME SCREEN */
+#level-badge { font-size: 15px; color: #555; font-weight: 600; }
+
+#pool-container { width: 100%; position: relative; height: 90px; }
+
+#progress-dots {
+  display: flex; gap: 8px;
+  position: absolute; top: 0;
+  left: 50%; transform: translateX(-50%);
+}
+.dot { width: 14px; height: 14px; border-radius: 50%; background: #ddd; border: 2px solid #bbb; transition: background 0.3s; }
+.dot.correct { background: #1D9E75; border-color: #1D9E75; }
+.dot.wrong { background: #E24B4A; border-color: #E24B4A; }
+
+#pool-track {
+  width: 100%; height: 48px;
+  background: #b3e0f7; border-radius: 24px;
+  position: relative; overflow: hidden;
+  border: 3px solid #7ec8e3; margin-top: 26px;
+}
+#pool-waves {
+  position: absolute; top:0; left:0; right:0; bottom:0;
+  background: repeating-linear-gradient(90deg, transparent, transparent 18px, rgba(255,255,255,0.2) 18px, rgba(255,255,255,0.2) 20px);
+  animation: wave 2s linear infinite;
+}
+@keyframes wave { from{background-position:0 0} to{background-position:40px 0} }
+#swimmer {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  font-size: 30px; transition: left 0.6s cubic-bezier(0.34,1.56,0.64,1);
+  z-index: 2; left: 2%;
+}
+#finish-flag { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 24px; z-index: 2; }
+
+#riddle-box {
+  background: white; border: 2px solid #d0e8f5; border-radius: 16px;
+  padding: 1.25rem 1.5rem; width: 100%; text-align: center;
+  min-height: 80px; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+#riddle-text { font-size: 20px; color: #222; line-height: 1.5; font-weight: 600; }
+
+#choices-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; width: 100%; }
+
+.choice-btn {
+  background: white; border: 2px solid #d0e8f5; border-radius: 16px;
+  padding: 1rem 0.5rem; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  min-height: 120px; justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+.choice-btn:hover { background: #f0f8ff; border-color: #7ec8e3; transform: scale(1.02); }
+.choice-btn:active { transform: scale(0.97); }
+.choice-btn.correct { border-color: #1D9E75; background: #E1F5EE; }
+.choice-btn.wrong { border-color: #E24B4A; background: #FCEBEB; animation: shake 0.3s; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+.choice-emoji { font-size: 42px; }
+.choice-label { font-size: 15px; color: #555; text-align: center; line-height: 1.3; font-weight: 500; }
+
+#feedback-msg { font-size: 18px; font-weight: 600; min-height: 28px; color: #555; text-align: center; }
+
+#speak-btn {
+  background: white; border: 2px solid #d0e8f5; border-radius: 12px;
+  padding: 8px 18px; font-size: 15px; color: #555; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  font-family: Arial, sans-serif; box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+#speak-btn:hover { background: #f0f8ff; border-color: #7ec8e3; }
+
+/* END SCREEN */
+#end-screen { text-align: center; padding-top: 1rem; }
+.big-emoji { font-size: 72px; }
+#end-title { font-size: 26px; font-weight: 700; color: #222; }
+#end-msg { font-size: 17px; color: #555; }
+#end-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+.action-btn {
+  background: #1D9E75; color: white; border: none; border-radius: 14px;
+  padding: 14px 28px; font-size: 18px; cursor: pointer;
+  font-family: Arial, sans-serif; font-weight: 700;
+  box-shadow: 0 3px 10px rgba(29,158,117,0.3);
+  transition: background 0.15s;
+}
+.action-btn:hover { background: #0F6E56; }
+.action-btn.secondary { background: #1a6fa8; box-shadow: 0 3px 10px rgba(26,111,168,0.3); }
+.action-btn.secondary:hover { background: #145a8a; }
+
+/* LOADING */
+#loading-overlay {
+  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(240,251,255,0.92); z-index: 100;
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 1rem; font-size: 18px; color: #555;
+}
+#loading-overlay.active { display: flex; }
+.spinner { width: 40px; height: 40px; border: 4px solid #d0e8f5; border-top-color: #1D9E75; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg)} }
+</style>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <span>מכין שאלות חדשות...</span>
+</div>
+
+<!-- HOME SCREEN -->
+<div id="home-screen" class="screen active">
+  <h1>🏊 משחק השחייה</h1>
+  <p class="subtitle">בְּחַר שָׁלָב וְשָׂחֵה קָדִימָה!</p>
+  <div id="levels-grid"></div>
+  <button id="start-btn" onclick="startNextLevel()">הַתְחֵל לִשְׂחֵק! 🏊</button>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="game-screen" class="screen">
+  <div id="level-badge">שלב 1</div>
+  <div id="pool-container">
+    <div id="progress-dots"></div>
+    <div id="pool-track">
+      <div id="pool-waves"></div>
+      <div id="swimmer">🏊</div>
+      <div id="finish-flag">🏁</div>
+    </div>
+  </div>
+  <div id="riddle-box">
+    <div id="riddle-text">טוען...</div>
+  </div>
+  <button id="speak-btn" onclick="speakCurrent()">🔊 קְרָא שׁוּב</button>
+  <div id="choices-grid"></div>
+  <div id="feedback-msg"></div>
+</div>
+
+<!-- END SCREEN -->
+<div id="end-screen" class="screen">
+  <div class="big-emoji" id="end-emoji"></div>
+  <h2 id="end-title"></h2>
+  <p id="end-msg"></p>
+  <div id="end-btns"></div>
+</div>
+
+<script>
+const QUESTIONS_PER_LEVEL = 5;
+let currentLevel = 1;
+let questions = [];
+let currentQ = 0;
+let answers = [];
+let currentRiddle = '';
+let usedRiddles = [];
+// levelResults: array of objects {level, perfect}
+let levelResults = JSON.parse(localStorage.getItem('swimLevels') || '[]');
+
+// ---- TTS ----
+let voicesReady = false;
+let voicesQueue = [];
+
+function getHebrewVoice() {
+  const voices = window.speechSynthesis.getVoices();
+  return voices.find(v => v.lang === 'he-IL')
+      || voices.find(v => v.lang === 'he')
+      || voices.find(v => v.lang.startsWith('he'))
+      || voices.find(v => v.lang.startsWith('iw'))
+      || null;
+}
+
+function initVoices() {
+  if (!('speechSynthesis' in window)) return;
+  const voices = window.speechSynthesis.getVoices();
+  if (voices.length > 0) {
+    voicesReady = true;
+    voicesQueue.forEach(fn => fn());
+    voicesQueue = [];
+  }
+}
+
+if ('speechSynthesis' in window) {
+  window.speechSynthesis.onvoiceschanged = () => {
+    voicesReady = true;
+    voicesQueue.forEach(fn => fn());
+    voicesQueue = [];
+  };
+  initVoices();
+}
+
+function speak(text, onDone) {
+  if (!('speechSynthesis' in window)) {
+    if (onDone) setTimeout(onDone, 1200);
+    return;
+  }
+  const doSpeak = () => {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'he-IL';
+    u.rate = 0.80;
+    u.pitch = 1.0;
+    const heVoice = getHebrewVoice();
+    if (heVoice) u.voice = heVoice;
+    u.onend = onDone || null;
+    u.onerror = () => { if (onDone) onDone(); };
+    window.speechSynthesis.speak(u);
+  };
+  if (voicesReady) {
+    doSpeak();
+  } else {
+    voicesQueue.push(doSpeak);
+  }
+}
+
+function speakCurrent() { if (currentRiddle) speak(currentRiddle); }
+
+// ---- Sounds ----
+function playSound(type) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    if (type === 'correct') {
+      osc.frequency.setValueAtTime(523, ctx.currentTime);
+      osc.frequency.setValueAtTime(659, ctx.currentTime+0.12);
+      osc.frequency.setValueAtTime(784, ctx.currentTime+0.24);
+      gain.gain.setValueAtTime(0.28, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.6);
+      osc.start(); osc.stop(ctx.currentTime+0.6);
+    } else if (type === 'wrong') {
+      osc.frequency.setValueAtTime(220, ctx.currentTime);
+      osc.frequency.setValueAtTime(180, ctx.currentTime+0.15);
+      gain.gain.setValueAtTime(0.28, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.35);
+      osc.start(); osc.stop(ctx.currentTime+0.35);
+    } else if (type === 'win') {
+      [523,659,784,1046].forEach((f,i) => {
+        const o2=ctx.createOscillator(), g2=ctx.createGain();
+        o2.connect(g2); g2.connect(ctx.destination);
+        o2.frequency.value=f;
+        g2.gain.setValueAtTime(0.22, ctx.currentTime+i*0.13);
+        g2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+i*0.13+0.35);
+        o2.start(ctx.currentTime+i*0.13); o2.stop(ctx.currentTime+i*0.13+0.35);
+      });
+    } else if (type === 'retry') {
+      osc.frequency.setValueAtTime(330, ctx.currentTime);
+      osc.frequency.setValueAtTime(277, ctx.currentTime+0.2);
+      gain.gain.setValueAtTime(0.22, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.45);
+      osc.start(); osc.stop(ctx.currentTime+0.45);
+    }
+  } catch(e) {}
+}
+
+// ---- Screens ----
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ---- Home screen ----
+function renderHomeScreen() {
+  const grid = document.getElementById('levels-grid');
+  grid.innerHTML = '';
+  const maxUnlocked = levelResults.length + 1;
+  for (let i = 1; i <= Math.max(10, maxUnlocked + 2); i++) {
+    const tile = document.createElement('div');
+    const result = levelResults.find(r => r.level === i);
+    if (i > maxUnlocked) {
+      tile.className = 'level-tile locked';
+      tile.innerHTML = `<span class="tile-icon">🔒</span><span class="tile-num">${i}</span>`;
+    } else if (result) {
+      tile.className = result.perfect ? 'level-tile perfect' : 'level-tile completed';
+      tile.innerHTML = `<span class="tile-icon">${result.perfect ? '🏆' : '✓'}</span><span class="tile-num">${i}</span>`;
+      tile.onclick = () => playLevel(i);
+    } else {
+      tile.className = 'level-tile available';
+      tile.innerHTML = `<span class="tile-icon">🏊</span><span class="tile-num">${i}</span>`;
+      tile.onclick = () => playLevel(i);
+    }
+    grid.appendChild(tile);
+  }
+}
+
+function startNextLevel() {
+  const next = levelResults.length + 1;
+  playLevel(next);
+}
+
+function playLevel(level) {
+  currentLevel = level;
+  fetchQuestions();
+}
+
+// ---- Fetch questions ----
+async function fetchQuestions() {
+  document.getElementById('loading-overlay').classList.add('active');
+  showScreen('game-screen');
+
+  const difficulty = currentLevel <= 3
+    ? 'קל מאוד - עולם מוכר לילד (חיות, פירות, כלים, צבעים, צורות, אוכל)'
+    : currentLevel <= 6 ? 'בינוני - פעולות יומיומיות ורגשות פשוטים'
+    : 'מאתגר - מושגים מופשטים ותכונות';
+
+  const avoidList = usedRiddles.length > 0
+    ? `\n\nאל תחזור על הנושאים הבאים:\n${usedRiddles.map((r,i)=>`${i+1}. ${r}`).join('\n')}`
+    : '';
+
+  const prompt = `אתה יוצר שאלות לילד בן 6 שלא יודע לקרוא. כל שאלה היא חידה עם שני תנאים. יש 3 תמונות - כל תמונה עונה על תנאי אחד בלבד, רק התמונה הנכונה עונה על שני התנאים.
+
+רמת קושי: ${difficulty}
+שלב: ${currentLevel}${avoidList}
+
+!!! חובה מוחלטת: כל מילה בעברית חייבת להיות עם ניקוד מלא !!!
+זה כולל: החידה, שמות הבחירות - כל תו עברי חייב ניקוד.
+לדוגמה: לא "כריש" אלא "כְּרִישׁ", לא "שוחה" אלא "שׁוֹחֶה", לא "מסוכן" אלא "מְסֻכָּן"
+
+החזר JSON בלבד ללא markdown לפי הפורמט הזה בדיוק:
+{"questions":[{"riddle":"חִידָה עִם נִיקּוּד מָלֵא עַל כָּל מִלָּה","choices":[{"emoji":"🦈","label":"כְּרִישׁ","correct":true},{"emoji":"🐬","label":"דּוֹלְפִין","correct":false},{"emoji":"🦁","label":"אַרְיֵה","correct":false}]}]}
+
+חוקים:
+- שני תנאים מפורשים בכל חידה
+- מסיח 1: עונה רק על תנאי אחד. מסיח 2: עונה רק על תנאי השני
+- אל תשתמש בחיות שלא באמת עפות (עוף, תרנגולת וכו' אינן עפות למרחקים)
+- בדוק שהתשובה הנכונה אכן עונה על שני התנאים
+- ${QUESTIONS_PER_LEVEL} שאלות מגוונות
+- אמוג'י מוכרים לילד
+- משפט קצר
+- ניקוד מלא מוחלט על כל מילה עברית - זה קריטי!`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
+    });
+    const data = await res.json();
+    const text = data.content.map(b => b.text||'').join('');
+    const parsed = JSON.parse(text.replace(/```json|```/g,'').trim());
+    questions = parsed.questions;
+    questions.forEach(q => usedRiddles.push(q.riddle));
+  } catch(e) {
+    questions = fallbackQuestions();
+  }
+
+  document.getElementById('loading-overlay').classList.remove('active');
+  currentQ = 0;
+  answers = [];
+  document.getElementById('level-badge').textContent = 'שָׁלָב ' + currentLevel;
+  updateDots();
+  updateSwimmer();
+  showQuestion();
+}
+
+function fallbackQuestions() {
+  return [
+    {riddle:"חיה שגם שוחה בים וגם מסוכנת",choices:[{emoji:"🐬",label:"דולפין",correct:false},{emoji:"🦁",label:"אריה",correct:false},{emoji:"🦈",label:"כריש",correct:true}]},
+    {riddle:"פרי שגם צהוב וגם חמוץ",choices:[{emoji:"🍌",label:"בננה",correct:false},{emoji:"🍓",label:"תות",correct:false},{emoji:"🍋",label:"לימון",correct:true}]},
+    {riddle:"כלי שגם כותבים איתו וגם מוחקים איתו",choices:[{emoji:"🖊️",label:"עט",correct:false},{emoji:"📏",label:"סרגל",correct:false},{emoji:"✏️",label:"עיפרון",correct:true}]},
+    {riddle:"בגד שגם חם וגם על הרגליים",choices:[{emoji:"🧣",label:"צעיף",correct:false},{emoji:"👟",label:"נעליים",correct:false},{emoji:"🧦",label:"גרביים",correct:true}]},
+    {riddle:"בעל חיים שגם חי במים וגם יש לו קשקשים",choices:[{emoji:"🐸",label:"צפרדע",correct:false},{emoji:"🦀",label:"סרטן",correct:false},{emoji:"🐟",label:"דג",correct:true}]}
+  ];
+}
+
+// ---- Game logic ----
+function updateSwimmer() {
+  document.getElementById('swimmer').style.left = (currentQ / QUESTIONS_PER_LEVEL * 88) + '%';
+}
+
+function updateDots() {
+  const dots = document.getElementById('progress-dots');
+  dots.innerHTML = '';
+  for (let i = 0; i < QUESTIONS_PER_LEVEL; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i < answers.length ? (' '+(answers[i]?'correct':'wrong')) : '');
+    dots.appendChild(d);
+  }
+}
+
+function showQuestion() {
+  if (currentQ >= questions.length) return;
+  const q = questions[currentQ];
+  currentRiddle = q.riddle;
+  document.getElementById('riddle-text').textContent = q.riddle;
+  document.getElementById('feedback-msg').textContent = '';
+
+  const grid = document.getElementById('choices-grid');
+  grid.innerHTML = '';
+  const shuffled = [...q.choices].sort(() => Math.random()-0.5);
+  shuffled.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.innerHTML = `<span class="choice-emoji">${c.emoji}</span><span class="choice-label">${c.label}</span>`;
+    btn.onclick = () => handleChoice(btn, c.correct, q, shuffled);
+    grid.appendChild(btn);
+  });
+
+  setTimeout(() => speak(q.riddle), 300);
+}
+
+function handleChoice(btn, isCorrect, q, shuffled) {
+  document.querySelectorAll('.choice-btn').forEach(b => b.onclick = null);
+
+  if (isCorrect) {
+    btn.classList.add('correct');
+    playSound('correct');
+    document.getElementById('feedback-msg').textContent = '✓ נָכוֹן!';
+    answers.push(true);
+    updateDots();
+
+    // שמע "כל הכבוד", ואז אחרי שסיים + שנייה נוספת — עבור לשאלה הבאה
+    speak('כָּל הַכָּבוֹד!', () => {
+      setTimeout(() => {
+        currentQ++;
+        updateSwimmer();
+        if (currentQ >= QUESTIONS_PER_LEVEL) setTimeout(showEndScreen, 300);
+        else showQuestion();
+      }, 1000);
+    });
+
+  } else {
+    btn.classList.add('wrong');
+    playSound('wrong');
+    document.getElementById('feedback-msg').textContent = 'נַסֶּה שׁוּב!';
+    answers.push(false);
+    updateDots();
+
+    speak('לֹא נָכוֹן, נַסֶּה שׁוּב!', () => {
+      setTimeout(() => {
+        btn.classList.remove('wrong');
+        document.getElementById('feedback-msg').textContent = '';
+        document.querySelectorAll('.choice-btn').forEach((b, i) => {
+          const c = shuffled[i];
+          if (c) b.onclick = () => handleChoice(b, c.correct, q, shuffled);
+        });
+      }, 400);
+    });
+  }
+}
+
+// ---- End screen ----
+function showEndScreen() {
+  const hasErrors = answers.some(a => !a);
+  const perfect = !hasErrors;
+
+  // שמור תוצאה
+  const existing = levelResults.findIndex(r => r.level === currentLevel);
+  if (existing >= 0) {
+    if (perfect) levelResults[existing].perfect = true;
+  } else {
+    levelResults.push({ level: currentLevel, perfect });
+  }
+  levelResults.sort((a,b) => a.level - b.level);
+  localStorage.setItem('swimLevels', JSON.stringify(levelResults));
+
+  showScreen('end-screen');
+  const btns = document.getElementById('end-btns');
+  btns.innerHTML = '';
+
+  if (perfect) {
+    playSound('win');
+    document.getElementById('end-emoji').textContent = '🏆';
+    document.getElementById('end-title').textContent = 'מוּשְׁלָם! עָבַרְתָּ אֶת הַשָּׁלָב!';
+    document.getElementById('end-msg').textContent = 'כָּל הַתְּשׁוּבוֹת נְכוֹנוֹת! אַתָּה אַלּוּף!';
+    speak('מוּשְׁלָם! עָבַרְתָּ אֶת הַשָּׁלָב! אַתָּה אַלּוּף!');
+
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'action-btn';
+    nextBtn.textContent = 'שָׁלָב הַבָּא 🏊';
+    nextBtn.onclick = () => { currentLevel++; fetchQuestions(); };
+    btns.appendChild(nextBtn);
+  } else {
+    playSound('retry');
+    document.getElementById('end-emoji').textContent = '💪';
+    document.getElementById('end-title').textContent = 'כִּמְעַט! נַסֶּה שׁוּב';
+    document.getElementById('end-msg').textContent = 'יֵשׁ לְךָ אֶת זֶה! נַסֶּה שׁוּב אֶת הַשָּׁלָב';
+    speak('כִּמְעַט הִצְלַחְתָּ! נַסֶּה שׁוּב אֶת הַשָּׁלָב');
+
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'action-btn';
+    retryBtn.textContent = 'נַסֶּה שׁוּב 🏊';
+    retryBtn.onclick = () => fetchQuestions();
+    btns.appendChild(retryBtn);
+  }
+
+  const homeBtn = document.createElement('button');
+  homeBtn.className = 'action-btn secondary';
+  homeBtn.textContent = 'מָסַךְ הַבַּיִת 🏠';
+  homeBtn.onclick = () => { renderHomeScreen(); showScreen('home-screen'); };
+  btns.appendChild(homeBtn);
+}
+
+// ---- Init ----
+renderHomeScreen();
+</script>
+</body>
+</html>
